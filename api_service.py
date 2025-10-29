@@ -468,7 +468,7 @@ class APIService:
         """Download Excel report of all finalized drafts"""
         try:
             response = requests.get(
-                f"{self.base_url}/mediaplan/drafts/download_report",
+                f"{self.base_url}/drafts/download_report",
                 timeout=LONG_TIMEOUT
             )
             response.raise_for_status()
