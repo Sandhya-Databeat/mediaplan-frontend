@@ -9,12 +9,19 @@ from typing import Dict, List, Any, Optional, Tuple
 import streamlit as st
 from io import BytesIO
 import json
+import os
+
 
 # API Configuration
 try:
-    API_BASE_URL = st.secrets["API_BASE_URL"]
-except (FileNotFoundError, KeyError, Exception):
-    API_BASE_URL = "http://localhost:8000"
+    # Try to get from Streamlit secrets (when deployed)
+    API_BASE_URL = st.secrets.get("API_BASE_URL", "https://mediaplan-backend.onrender.com")
+except Exception:
+    # Fallback for local development
+
+    API_BASE_URL = os.getenv("API_BASE_URL", "https://mediaplan-backend.onrender.com")
+
+
 
 # Request timeout settings
 DEFAULT_TIMEOUT = 30  # 30 seconds
