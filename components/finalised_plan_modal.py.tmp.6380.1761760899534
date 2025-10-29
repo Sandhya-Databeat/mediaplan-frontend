@@ -66,42 +66,26 @@ def finalized_plans_modal(api_service, on_close_callback):
             st.session_state.show_copy_json = True
             st.rerun()
 
-    # Download Excel - prepare report first
+    # Download Excel
     with col4:
-        # Check if we need to prepare download
-        if not st.session_state.get('download_ready', False):
-            if st.button("📥 Download", use_container_width=True, type="primary", key="init_download"):
-                with st.spinner("🔄 Generating Excel report..."):
-                    try:
-                        # Debug: Show what we're sending
-                        st.write(f"🔍 Debug: Requesting download from {api_service.base_url}")
-                        st.write(f"🔍 Debug: Number of finalized plans: {len(finalized_plans)}")
+        # Pre-fetch the report for download button
+        if st.button("🔄 Prepare Download", use_container_width=True, type="secondary", key="prepare_download"):
+            with st.spinner("Generating Excel report..."):
+                st.session_state.download_preparing = True
+                blob, filename = api_service.download_finalized_report()
+                if blob and filename:
+                    st.session_state.download_blob = blob
+                    st.session_state.download_filename = filename
+                    st.session_state.download_ready = True
+                    st.success(f"✅ Report ready!")
+                else:
+                    st.error("❌ Failed to generate Excel report")
+                    st.session_state.download_ready = False
+            st.rerun()
 
-                        blob, filename = api_service.download_finalized_report()
-
-                        # Debug: Check what we received
-                        if blob:
-                            st.write(f"🔍 Debug: Received blob of size: {len(blob)} bytes")
-                            st.write(f"🔍 Debug: Filename: {filename}")
-                        else:
-                            st.write("🔍 Debug: No blob received!")
-
-                        if blob and filename and len(blob) > 0:
-                            st.session_state.download_blob = blob
-                            st.session_state.download_filename = filename
-                            st.session_state.download_ready = True
-                            st.success(f"✅ Report generated: {filename} ({len(blob)} bytes)")
-                        else:
-                            st.error("❌ Empty or missing Excel report")
-                            st.write("💡 Tip: Make sure you have finalized at least one draft")
-                    except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
-                        import traceback
-                        with st.expander("🐛 Error Details"):
-                            st.code(traceback.format_exc())
-                st.rerun()
-        else:
-            # Show download button
+    # Show download button if ready
+    if st.session_state.get('download_ready', False):
+        with col4:
             st.download_button(
                 label="📥 Download Excel",
                 data=st.session_state.download_blob,
@@ -111,10 +95,6 @@ def finalized_plans_modal(api_service, on_close_callback):
                 type="primary",
                 key="download_excel_final"
             )
-            # Reset button
-            if st.button("🔄 Regenerate", use_container_width=True, key="reset_download"):
-                st.session_state.download_ready = False
-                st.rerun()
 
     st.markdown("---")
 

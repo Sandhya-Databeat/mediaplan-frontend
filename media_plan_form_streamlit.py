@@ -1451,9 +1451,25 @@ def main():
 
             with col2:
                 if st.button("📝 Generate Draft", type="primary", use_container_width=True):
-                    # Directly call the create draft section inline (no popup)
-                    from components.create_draft_modal import create_draft_modal
-                    create_draft_modal()
+                    # Set flag to show draft modal
+                    st.session_state.show_draft_modal = True
+                    st.rerun()
+
+            # Show draft modal if flag is set
+            if st.session_state.get('show_draft_modal', False):
+                from components.create_draft_modal import create_draft_modal
+
+                # Define close callback
+                def close_draft_modal():
+                    st.session_state.show_draft_modal = False
+
+                # Call modal with all required arguments
+                create_draft_modal(
+                    form_data=st.session_state.form_data,
+                    insights=st.session_state.insights,
+                    api_service=api_service,
+                    on_close_callback=close_draft_modal
+                )
 
 
 
