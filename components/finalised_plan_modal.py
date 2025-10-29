@@ -1,0 +1,214 @@
+import streamlit as st
+from typing import Dict, Any
+import json
+from datetime import datetime
+
+
+def format_budget(budget_level: str) -> str:
+    """Format budget level for display"""
+    return f"{budget_level}"
+
+
+def format_date(date_string: str) -> str:
+    """Format date string to readable format"""
+    try:
+        date_obj = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+        return date_obj.strftime("%Y-%m-%d")
+    except:
+        return date_string
+
+
+def finalized_plans_modal(api_service, on_close_callback):
+    """
+    Display finalized media plans with options to:
+    - Toggle between Card View and JSON View
+    - Copy JSON to clipboard
+    - Download Excel report
+    """
+
+    st.markdown("### 📄 Finalized Media Plans")
+    st.markdown("View all finalized plans and download the final Excel report")
+
+    # Load finalized plans
+    if 'finalized_plans_loaded' not in st.session_state:
+        with st.spinner("Loading finalized plans..."):
+            response = api_service.get_finalized_plans()
+            if response.get('success'):
+                st.session_state.finalized_plans = response.get('finalized_plans', {})
+                st.session_state.finalized_plans_loaded = True
+            else:
+                st.error(f"Failed to load finalized plans: {response.get('message', 'Unknown error')}")
+                st.session_state.finalized_plans = {}
+                st.session_state.finalized_plans_loaded = True
+
+    finalized_plans = st.session_state.get('finalized_plans', {})
+    budget_levels = list(finalized_plans.keys())
+
+    # Action buttons
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+
+    # View toggle
+    if 'finalized_view_mode' not in st.session_state:
+        st.session_state.finalized_view_mode = 'card'
+
+    with col2:
+        if st.button(
+            "🔄 " + ("Card View" if st.session_state.finalized_view_mode == 'json' else "JSON View"),
+            use_container_width=True
+        ):
+            st.session_state.finalized_view_mode = 'json' if st.session_state.finalized_view_mode == 'card' else 'card'
+            st.rerun()
+
+    # Copy JSON
+    with col3:
+        if st.button("📋 Copy JSON", use_container_width=True):
+            # In Streamlit, we'll display the JSON for manual copying
+            st.session_state.show_copy_json = True
+            st.rerun()
+
+    # Download Excel
+    with col4:
+        if st.button("📥 Download", use_container_width=True, type="primary"):
+            with st.spinner("Generating Excel report..."):
+                blob, filename = api_service.download_finalized_report()
+                if blob and filename:
+                    st.download_button(
+                        label="📥 Download Excel File",
+                        data=blob,
+                        file_name=filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        key="download_excel_btn"
+                    )
+                    st.success(f"📥 Report ready: {filename}")
+                else:
+                    st.error("Failed to generate Excel report")
+
+    st.markdown("---")
+
+    # Display copy JSON section if needed
+    if st.session_state.get('show_copy_json', False):
+        st.markdown("#### 📋 Copy JSON Data")
+        st.code(json.dumps(finalized_plans, indent=2), language='json')
+        if st.button("🚫 Close JSON View"):
+            st.session_state.show_copy_json = False
+            st.rerun()
+        st.markdown("---")
+
+    # Display content based on view mode
+    if not budget_levels:
+        st.info("⚠️ No finalized plans found")
+        st.write("Create and finalize some media plan drafts to see them here")
+
+    elif st.session_state.finalized_view_mode == 'json':
+        # JSON View
+        st.markdown("#### JSON View")
+        st.json(finalized_plans)
+
+    else:
+        # Card View
+        st.markdown(f"#### 🏷️ {len(budget_levels)} Budget Level{'s' if len(budget_levels) != 1 else ''}")
+
+        for budget_level in budget_levels:
+            budget_data = finalized_plans[budget_level]
+
+            # Budget level card
+            st.markdown(f"""
+            <div style="border-left: 4px solid #1DB954; padding-left: 16px; margin-bottom: 24px;">
+                <h3 style="color: #1DB954; margin: 0;">{format_budget(budget_level)} Budget Level</h3>
+                <p style="color: #6b7280; margin: 4px 0;">
+                    {len(budget_data)} format{'s' if len(budget_data) != 1 else ''}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Asset format cards in columns
+            num_formats = len(budget_data)
+            cols = st.columns(min(num_formats, 3))
+
+            for idx, (asset_format, plan_data) in enumerate(budget_data.items()):
+                with cols[idx % 3]:
+                    # Format icon
+                    format_icons = {
+                        'AUDIO': '🎵',
+                        'VIDEO': '🎥',
+                        'IMAGE': '🖼️',
+                        'DISPLAY': '🖥️'
+                    }
+                    icon = format_icons.get(asset_format, '🖼️')
+
+                    # Card container
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="
+                            background: white;
+                            padding: 16px;
+                            border-radius: 12px;
+                            border: 2px solid #e5e7eb;
+                            margin-bottom: 16px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h4 style="margin: 0; font-size: 1.1rem;">{icon} {asset_format}</h4>
+                                <span style="
+                                    background-color: #d1fae5;
+                                    color: #065f46;
+                                    padding: 4px 12px;
+                                    border-radius: 9999px;
+                                    font-size: 0.875rem;
+                                    font-weight: 500;
+                                ">Finalized</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        # Plan details
+                        form_data = plan_data.get('form_data', {})
+
+                        st.markdown("**Campaign:**")
+                        st.write(form_data.get('campaign_name', 'N/A'))
+
+                        st.markdown("**Objective:**")
+                        st.write(form_data.get('campaign_objective', 'N/A'))
+
+                        if form_data.get('budget_type') and form_data.get('micro_amount'):
+                            st.markdown("**Original Budget:**")
+                            budget_display = f"${form_data['micro_amount'] / 1000000:.0f} ({form_data['budget_type'].lower()})"
+                            st.write(budget_display)
+
+                        st.markdown("**Finalized:**")
+                        finalized_date = plan_data.get('finalized_at', 'N/A')
+                        st.write(format_date(finalized_date) if finalized_date != 'N/A' else finalized_date)
+
+                        # Estimated reach
+                        insights = plan_data.get('insights', {})
+                        audience_estimates = insights.get('audience_estimates', [])
+                        if audience_estimates and len(audience_estimates) > 0:
+                            estimate = audience_estimates[0]
+                            reach_min = estimate.get('estimated_reach_min', 0) / 1000
+                            reach_max = estimate.get('estimated_reach_max', 0) / 1000
+                            st.markdown("**Est. Reach:**")
+                            st.write(f"{reach_min:.0f}K - {reach_max:.0f}K")
+
+                        # Draft ID
+                        draft_id = plan_data.get('draft_id', 'N/A')
+                        if draft_id != 'N/A':
+                            st.markdown("**Draft ID:**")
+                            st.code(draft_id[:8] + "...", language=None)
+
+            st.markdown("---")
+
+    # Close button
+    if st.button("L Close", use_container_width=False):
+        # Clean up session state
+        if 'finalized_plans_loaded' in st.session_state:
+            del st.session_state.finalized_plans_loaded
+        if 'finalized_plans' in st.session_state:
+            del st.session_state.finalized_plans
+        if 'finalized_view_mode' in st.session_state:
+            del st.session_state.finalized_view_mode
+        if 'show_copy_json' in st.session_state:
+            del st.session_state.show_copy_json
+
+        on_close_callback()
+        st.rerun()

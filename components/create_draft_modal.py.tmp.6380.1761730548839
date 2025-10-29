@@ -1,0 +1,62 @@
+import streamlit as st
+from api_service import api_service
+
+def create_draft_modal():
+    """Generate Draft section — no modal popup"""
+    
+    st.markdown("### 📝 Create Media Plan Draft")
+    st.markdown("Review your campaign setup and generate a draft below.")
+    st.divider()
+
+    # ✅ Ensure session data exists
+    if "form_data" not in st.session_state or not st.session_state.form_data:
+        st.warning("⚠️ Please fill out campaign details before creating a draft.")
+        return
+
+    # ✅ Combine everything in one dictionary
+    media_plan_data = {
+        "form_data": st.session_state.form_data,
+        "bid_estimate": st.session_state.get("bid_estimate"),
+        "insights": st.session_state.get("insights"),
+    }
+
+    # Optional preview for debugging
+    with st.expander("🔍 Preview Media Plan Data", expanded=False):
+        st.json(media_plan_data)
+
+    # --- Generate Draft Button ---
+    st.markdown("Once everything looks fine, click below to generate your draft.")
+    generate_col, draft_col = st.columns([2, 1])
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col2:
+        if st.button("🚀 Create Draft", type="primary", use_container_width=True):
+            with st.spinner("Creating your draft..."):
+                try:
+                    response = api_service.create_draft(media_plan_data)
+                    if response and response.get("success"):
+                        st.success("✅ Draft created successfully!")
+                        st.session_state.draft_created = True
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to create draft. Please check details below.")
+                        st.json(response)
+                except Exception as e:
+                    st.error(f"⚠️ Error creating draft: {e}")
+
+
+
+    # --- Post creation info ---
+    if st.session_state.get("draft_created"):
+        st.markdown("---")
+        st.success("✅ Draft Created Successfully!")
+        st.info("Your draft has been saved. You can now:")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📁 View All Drafts", type="primary", use_container_width=True):
+                st.switch_page("pages/mediaplandrafts.py")
+        with col2:
+            if st.button("➕ Create Another Draft", use_container_width=True):
+                st.session_state.draft_created = False
+                st.rerun()

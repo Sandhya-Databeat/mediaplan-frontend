@@ -1,0 +1,180 @@
+import streamlit as st
+from api_service import api_service
+
+# Predefined budget options (in thousands)
+PREDEFINED_BUDGETS = [50, 100, 150, 200, 250, 300, 400, 500]
+
+def create_draft_modal():
+    """Generate Draft section with budget selection"""
+
+    st.markdown("### 📝 Create Media Plan Draft")
+    st.markdown("Configure your draft budget and asset format, then create the draft.")
+    st.divider()
+
+    # Ensure session data exists
+    if "form_data" not in st.session_state or not st.session_state.form_data:
+        st.warning("⚠️ Please fill out campaign details before creating a draft.")
+        return
+
+    form_data = st.session_state.form_data
+    insights = st.session_state.get("insights")
+
+    if not insights:
+        st.warning("⚠️ Please generate insights before creating a draft.")
+        return
+
+    # Initialize draft config in session state
+    if 'draft_config' not in st.session_state:
+        st.session_state.draft_config = {
+            'budget_level': '100',
+            'custom_budget': False,
+            'asset_format': form_data.get('asset_formats', 'AUDIO')
+        }
+
+    draft_config = st.session_state.draft_config
+
+    # Display campaign info
+    st.markdown("#### 📊 Campaign Information")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info(f"**Campaign Name:** {form_data.get('campaign_name', 'N/A')}")
+    with col2:
+        # Asset format is auto-selected from form data but shown here
+        asset_format = form_data.get('asset_formats', 'AUDIO')
+        st.info(f"**Asset Format:** {asset_format}")
+        draft_config['asset_format'] = asset_format
+
+    st.markdown("---")
+
+    # Budget Selection
+    st.markdown("#### 💰 Budget Level")
+    st.caption("Select a predefined budget or enter a custom amount (values in thousands, e.g., 100k = $100,000)")
+
+    # Predefined budget buttons
+    st.markdown("**Quick Select:**")
+    cols = st.columns(4)
+    for idx, budget in enumerate(PREDEFINED_BUDGETS):
+        with cols[idx % 4]:
+            if st.button(
+                f"{budget}k",
+                key=f"budget_{budget}",
+                use_container_width=True,
+                type="primary" if draft_config['budget_level'] == str(budget) else "secondary"
+            ):
+                draft_config['budget_level'] = str(budget)
+                draft_config['custom_budget'] = False
+                st.rerun()
+
+    # Custom budget option
+    st.markdown("---")
+    use_custom = st.checkbox("Use Custom Budget", value=draft_config['custom_budget'])
+    draft_config['custom_budget'] = use_custom
+
+    if use_custom:
+        custom_budget = st.number_input(
+            "Enter custom budget amount (in thousands)",
+            min_value=1,
+            value=int(draft_config['budget_level']),
+            step=1,
+            key="custom_budget_input",
+            help="E.g., enter 100 for $100,000"
+        )
+        draft_config['budget_level'] = str(custom_budget)
+
+    # Display selected budget
+    selected_budget_k = int(draft_config['budget_level'])
+    st.success(f"✅ Selected Budget: **${selected_budget_k}k** (${selected_budget_k * 1000:,})")
+
+    st.markdown("---")
+
+    # Optional preview for debugging
+    with st.expander("🔍 Preview Draft Data (Debug)", expanded=False):
+        preview_data = {
+            "campaign_name": form_data.get('campaign_name'),
+            "budget_level": f"{draft_config['budget_level']}k",
+            "asset_format": draft_config['asset_format'],
+            "form_data": form_data,
+            "insights": insights
+        }
+        st.json(preview_data)
+
+    # Create Draft Button
+    st.markdown("### 🚀 Ready to Create Draft?")
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col2:
+        if st.button("🚀 Create Draft", type="primary", use_container_width=True, key="create_draft_btn"):
+            with st.spinner("Creating your draft..."):
+                try:
+                    # Prepare data in the format the API expects (matching React code)
+                    budget_in_thousands = int(draft_config['budget_level'])
+                    budget_micro_amount = budget_in_thousands * 1000 * 1000000  # Convert to micro units
+                    campaign_name = form_data.get('campaign_name', 'Untitled Campaign')
+                    asset_format = draft_config['asset_format']
+
+                    # Prepare form_data with required fields
+                    prepared_form_data = {
+                        **form_data,
+                        'asset_formats': asset_format,
+                        'countries': form_data.get('countries', 'US'),
+                        'devices': form_data.get('devices', ['DESKTOP']),
+                        'budget_type': 'LIFETIME',
+                        'micro_amount': form_data.get('micro_amount', budget_micro_amount),
+                        'draft_budget_amount': budget_micro_amount,
+                        'draft_budget_name': campaign_name
+                    }
+
+                    # Prepare insights with rounded bid estimates
+                    prepared_insights = {
+                        **insights,
+                        'bid_estimates': {
+                            **insights.get('bid_estimates', {}),
+                            'bid_estimate_min': int(insights.get('bid_estimates', {}).get('bid_estimate_min', 0)),
+                            'bid_estimate_max': int(insights.get('bid_estimates', {}).get('bid_estimate_max', 0))
+                        }
+                    }
+
+                    # Create draft data matching React structure
+                    draft_data = {
+                        'campaign_name': campaign_name,
+                        'budget_name': campaign_name,  # Use campaign name as budget name
+                        'budget_level': f"{budget_in_thousands}k",
+                        'asset_format': asset_format,
+                        'form_data': prepared_form_data,
+                        'insights': prepared_insights
+                    }
+
+                    # Call API
+                    response = api_service.create_draft(draft_data)
+
+                    if response and response.get("success"):
+                        st.success("✅ Draft created successfully!")
+                        st.session_state.draft_created = True
+                        # Clear draft config for next draft
+                        if 'draft_config' in st.session_state:
+                            del st.session_state.draft_config
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to create draft. Please check details below.")
+                        st.json(response)
+
+                except Exception as e:
+                    st.error(f"⚠️ Error creating draft: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+
+    # Post creation info
+    if st.session_state.get("draft_created"):
+        st.markdown("---")
+        st.success("✅ Draft Created Successfully!")
+        st.info("Your draft has been saved. You can now:")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📁 View All Drafts", type="primary", use_container_width=True, key="view_drafts_btn"):
+                st.session_state.draft_created = False
+                st.switch_page("pages/mediaplandrafts.py")
+        with col2:
+            if st.button("➕ Create Another Draft", use_container_width=True, key="create_another_btn"):
+                st.session_state.draft_created = False
+                st.rerun()
