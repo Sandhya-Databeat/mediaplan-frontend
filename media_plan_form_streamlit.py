@@ -1299,7 +1299,7 @@ def main():
                 update_form_data('start_date', start_date.strftime('%Y-%m-%d'))
 
         with col2:
-            end_date = st.date_input("End Date *", min_value=start_date if start_date else None, key="end_date_input", help="When should your campaign end?")
+            end_date = st.date_input("End Date *", value=None, min_value=start_date if start_date else None, key="end_date_input", help="When should your campaign end?")
             if end_date:
                 update_form_data('end_date', end_date.strftime('%Y-%m-%d'))
 
