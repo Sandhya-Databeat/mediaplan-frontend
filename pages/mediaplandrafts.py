@@ -100,24 +100,47 @@ st.markdown("""
         color: #065f46;
     }
     .stSelectbox > div > div {
-        background-color: white;
-        color: black;
+        background-color: white !important;
+        color: black !important;
         border: 2px solid #191414 !important;
         border-radius: 8px !important;
     }
     .stSelectbox > div > div > div {
-        color: black;
+        color: black !important;
+        background-color: white !important;
     }
     [data-baseweb="select"] {
-        background-color: white;
+        background-color: white !important;
+        color: black !important;
         border: 2px solid #191414 !important;
         border-radius: 8px !important;
     }
     [data-baseweb="select"] > div {
-        background-color: white;
-        color: black;
+        background-color: white !important;
+        color: black !important;
         border: 2px solid #191414 !important;
         border-radius: 8px !important;
+    }
+    [data-baseweb="select"] input {
+        color: black !important;
+        background-color: white !important;
+    }
+    [data-baseweb="select"] svg {
+        color: black !important;
+    }
+    div[data-baseweb="popover"] {
+        background-color: white !important;
+    }
+    div[role="listbox"] {
+        background-color: white !important;
+    }
+    div[role="option"] {
+        background-color: white !important;
+        color: black !important;
+    }
+    div[role="option"]:hover {
+        background-color: #f3f4f6 !important;
+        color: black !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -317,12 +340,18 @@ def main():
 
     with col3:
         if len(st.session_state.selected_drafts) > 0:
-            if st.button(f"✅ Finalize Selected ({len(st.session_state.selected_drafts)})", use_container_width=True, type="primary"):
-                response = api_service.finalize_drafts(st.session_state.selected_drafts)
-                if response.get("success"):
-                    st.success(f"Successfully finalized {response.get('total_finalized', 0)} media plans")
-                    st.session_state.selected_drafts = {}
-                    
+            if st.button(f"✅ Finalize Selected ({len(st.session_state.selected_drafts)})", use_container_width=True, type="primary", key="finalize_header"):
+                # Store selected drafts before making API call
+                drafts_to_finalize = st.session_state.selected_drafts.copy()
+                with st.spinner("Finalizing drafts..."):
+                    response = api_service.finalize_drafts(drafts_to_finalize)
+                    if response.get("success"):
+                        st.success(f"Successfully finalized {response.get('total_finalized', 0)} media plans")
+                        st.session_state.selected_drafts = {}
+                        st.rerun()
+                    else:
+                        st.error(f"Failed to finalize drafts: {response.get('message', 'Unknown error')}")
+
 
     if not campaigns:
         st.info("📁 No Drafts Found")
@@ -400,11 +429,16 @@ def main():
             # Finalize button at top of content
             if len(st.session_state.selected_drafts) > 0:
                 if st.button(f"✅ Finalize ({len(st.session_state.selected_drafts)})", key="finalize_top", type="primary"):
-                    response = api_service.finalize_drafts(st.session_state.selected_drafts)
-                    if response.get("success"):
-                        st.success(f"Successfully finalized {response.get('total_finalized', 0)} media plans")
-                        st.session_state.selected_drafts = {}
-                        st.rerun()
+                    # Store selected drafts before making API call
+                    drafts_to_finalize = st.session_state.selected_drafts.copy()
+                    with st.spinner("Finalizing drafts..."):
+                        response = api_service.finalize_drafts(drafts_to_finalize)
+                        if response.get("success"):
+                            st.success(f"Successfully finalized {response.get('total_finalized', 0)} media plans")
+                            st.session_state.selected_drafts = {}
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to finalize drafts: {response.get('message', 'Unknown error')}")
 
             # Display drafts by asset format
             format_cols = st.columns(min(len(budget_data), 3))
