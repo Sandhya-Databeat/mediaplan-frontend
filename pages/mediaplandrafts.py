@@ -157,6 +157,17 @@ if 'show_finalized_modal' not in st.session_state:
     st.session_state.show_finalized_modal = False
 if 'editing_draft' not in st.session_state:
     st.session_state.editing_draft = None
+if 'trigger_finalize' not in st.session_state:
+    st.session_state.trigger_finalize = False
+if 'drafts_to_finalize' not in st.session_state:
+    st.session_state.drafts_to_finalize = {}
+
+# Callback Functions
+def trigger_finalize_callback():
+    """Callback to trigger finalize action"""
+    st.session_state.trigger_finalize = True
+    st.session_state.drafts_to_finalize = st.session_state.selected_drafts.copy()
+    print(f"FINALIZE CALLBACK TRIGGERED - Drafts to finalize: {st.session_state.drafts_to_finalize}")
 
 # Helper Functions
 def transform_drafts_data(raw_drafts: Dict) -> Dict:
@@ -263,6 +274,23 @@ def get_budget_description(budget_data: Dict) -> str:
 
 # Main Application
 def main():
+    # Handle finalize trigger FIRST before any UI rendering
+    if st.session_state.trigger_finalize:
+        print(f"EXECUTING FINALIZE - Drafts: {st.session_state.drafts_to_finalize}")
+        st.session_state.trigger_finalize = False
+
+        if st.session_state.drafts_to_finalize:
+            with st.spinner("Finalizing drafts..."):
+                response = api_service.finalize_drafts(st.session_state.drafts_to_finalize)
+                print(f"FINALIZE RESPONSE: {response}")
+
+                if response.get("success"):
+                    st.success(f"✅ Successfully finalized {response.get('total_finalized', 0)} media plans")
+                    st.session_state.selected_drafts = {}
+                    st.session_state.drafts_to_finalize = {}
+                else:
+                    st.error(f"❌ Failed to finalize drafts: {response.get('message', 'Unknown error')}")
+
     # Header
     col1, col2 = st.columns([1, 10])
     with col1:
@@ -340,17 +368,13 @@ def main():
 
     with col3:
         if len(st.session_state.selected_drafts) > 0:
-            if st.button(f"✅ Finalize Selected ({len(st.session_state.selected_drafts)})", use_container_width=True, type="primary", key="finalize_header"):
-                # Store selected drafts before making API call
-                drafts_to_finalize = st.session_state.selected_drafts.copy()
-                with st.spinner("Finalizing drafts..."):
-                    response = api_service.finalize_drafts(drafts_to_finalize)
-                    if response.get("success"):
-                        st.success(f"Successfully finalized {response.get('total_finalized', 0)} media plans")
-                        st.session_state.selected_drafts = {}
-                        st.rerun()
-                    else:
-                        st.error(f"Failed to finalize drafts: {response.get('message', 'Unknown error')}")
+            st.button(
+                f"✅ Finalize Selected ({len(st.session_state.selected_drafts)})",
+                use_container_width=True,
+                type="primary",
+                key="finalize_header",
+                on_click=trigger_finalize_callback
+            )
 
 
     if not campaigns:
@@ -428,17 +452,12 @@ def main():
 
             # Finalize button at top of content
             if len(st.session_state.selected_drafts) > 0:
-                if st.button(f"✅ Finalize ({len(st.session_state.selected_drafts)})", key="finalize_top", type="primary"):
-                    # Store selected drafts before making API call
-                    drafts_to_finalize = st.session_state.selected_drafts.copy()
-                    with st.spinner("Finalizing drafts..."):
-                        response = api_service.finalize_drafts(drafts_to_finalize)
-                        if response.get("success"):
-                            st.success(f"Successfully finalized {response.get('total_finalized', 0)} media plans")
-                            st.session_state.selected_drafts = {}
-                            st.rerun()
-                        else:
-                            st.error(f"Failed to finalize drafts: {response.get('message', 'Unknown error')}")
+                st.button(
+                    f"✅ Finalize ({len(st.session_state.selected_drafts)})",
+                    key="finalize_top",
+                    type="primary",
+                    on_click=trigger_finalize_callback
+                )
 
             # Display drafts by asset format
             format_cols = st.columns(min(len(budget_data), 3))

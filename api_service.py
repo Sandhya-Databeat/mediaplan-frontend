@@ -405,14 +405,18 @@ class APIService:
     def finalize_drafts(self, selected_drafts: Dict[str, str]) -> Dict[str, Any]:
         """Finalize selected drafts"""
         try:
+            print(f"API SERVICE - Calling finalize endpoint with: {selected_drafts}")
             response = requests.post(
                 f"{self.base_url}/mediaplan/drafts/finalize",
                 json={"selected_drafts": selected_drafts},
                 timeout=self.timeout
             )
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            print(f"API SERVICE - Finalize response: {result}")
+            return result
         except Exception as e:
+            print(f"API SERVICE - Finalize error: {e}")
             return self._handle_error(e, "finalizing drafts")
 
     def get_finalized_plans(self) -> Dict[str, Any]:
