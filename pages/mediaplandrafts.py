@@ -371,8 +371,8 @@ def main():
             st.session_state.show_finalized_modal = True
 
             
-    st.write("DEBUG - selected_drafts:", st.session_state.selected_drafts)
-    st.write("DEBUG - API Base URL:", api_service.base_url)
+    # st.write("DEBUG - selected_drafts:", st.session_state.selected_drafts)
+    # st.write("DEBUG - API Base URL:", api_service.base_url)
 
     with col3:
         if len(st.session_state.selected_drafts) > 0:
