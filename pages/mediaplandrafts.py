@@ -157,10 +157,6 @@ if 'show_finalized_modal' not in st.session_state:
     st.session_state.show_finalized_modal = False
 if 'editing_draft' not in st.session_state:
     st.session_state.editing_draft = None
-if 'pending_finalize' not in st.session_state:
-    st.session_state.pending_finalize = False
-if 'pending_finalize_drafts' not in st.session_state:
-    st.session_state.pending_finalize_drafts = {}
 
 # Helper Functions
 def transform_drafts_data(raw_drafts: Dict) -> Dict:
@@ -267,37 +263,6 @@ def get_budget_description(budget_data: Dict) -> str:
 
 # Main Application
 def main():
-    # CRITICAL: Check for pending finalize action BEFORE any other UI/API calls
-    if 'pending_finalize' in st.session_state and st.session_state.pending_finalize:
-        drafts_to_finalize = st.session_state.get('pending_finalize_drafts', {})
-        st.session_state.pending_finalize = False
-
-        if drafts_to_finalize:
-            st.write("🚀 EXECUTING FINALIZE ACTION...")
-            st.write(f"📋 Drafts: {drafts_to_finalize}")
-            print(f"===== FINALIZE EXECUTING - Drafts: {drafts_to_finalize} =====")
-
-            try:
-                response = api_service.finalize_drafts(drafts_to_finalize)
-                st.write(f"📥 Response: {response}")
-                print(f"===== FINALIZE RESPONSE: {response} =====")
-
-                if response.get("success"):
-                    st.success(f"✅ Successfully finalized {response.get('total_finalized', 0)} media plans!")
-                    st.session_state.selected_drafts = {}
-                    st.session_state.pending_finalize_drafts = {}
-                    st.balloons()
-                    import time
-                    time.sleep(2)
-                    st.rerun()
-                else:
-                    st.error(f"❌ Failed: {response.get('message', 'Unknown error')}")
-            except Exception as e:
-                st.error(f"❌ Exception: {str(e)}")
-                print(f"===== FINALIZE ERROR: {e} =====")
-
-            st.stop()  # Stop execution here to show results
-
     # Header
     col1, col2 = st.columns([1, 10])
     with col1:
@@ -371,8 +336,8 @@ def main():
             st.session_state.show_finalized_modal = True
 
             
-    # st.write("DEBUG - selected_drafts:", st.session_state.selected_drafts)
-    # st.write("DEBUG - API Base URL:", api_service.base_url)
+    st.write("DEBUG - selected_drafts:", st.session_state.selected_drafts)
+    st.write("DEBUG - API Base URL:", api_service.base_url)
 
     with col3:
         if len(st.session_state.selected_drafts) > 0:
@@ -382,12 +347,41 @@ def main():
                 type="primary",
                 key="finalize_header"
             ):
-                # Set pending finalize flag and store drafts
-                st.session_state.pending_finalize = True
-                st.session_state.pending_finalize_drafts = st.session_state.selected_drafts.copy()
-                print(f"===== BUTTON CLICKED - Setting pending_finalize flag =====")
-                print(f"===== Drafts stored: {st.session_state.pending_finalize_drafts} =====")
-                st.rerun()
+                # EXECUTE FINALIZE IMMEDIATELY - No pending flags, no reruns
+                drafts_to_finalize = st.session_state.selected_drafts.copy()
+
+                st.write("=" * 50)
+                st.write("🚀 BUTTON CLICKED - EXECUTING FINALIZE NOW")
+                st.write(f"📋 Drafts to finalize: {drafts_to_finalize}")
+                st.write(f"🌐 API URL: {api_service.base_url}/mediaplan/drafts/finalize")
+                st.write("=" * 50)
+
+                print(f"===== BUTTON CLICKED - EXECUTING FINALIZE =====")
+                print(f"===== Drafts: {drafts_to_finalize} =====")
+                print(f"===== API URL: {api_service.base_url}/mediaplan/drafts/finalize =====")
+
+                with st.spinner("🔄 Calling finalize API..."):
+                    try:
+                        response = api_service.finalize_drafts(drafts_to_finalize)
+
+                        st.write(f"📥 API Response: {response}")
+                        print(f"===== FINALIZE RESPONSE: {response} =====")
+
+                        if response.get("success"):
+                            st.success(f"✅ Successfully finalized {response.get('total_finalized', 0)} media plans!")
+                            st.session_state.selected_drafts = {}
+                            st.balloons()
+                            import time
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Failed: {response.get('message', 'Unknown error')}")
+                            st.json(response)
+                    except Exception as e:
+                        st.error(f"❌ Exception occurred: {str(e)}")
+                        print(f"===== FINALIZE EXCEPTION: {e} =====")
+                        import traceback
+                        st.code(traceback.format_exc())
 
 
     if not campaigns:
@@ -470,12 +464,41 @@ def main():
                     type="primary",
                     key="finalize_top"
                 ):
-                    # Set pending finalize flag and store drafts
-                    st.session_state.pending_finalize = True
-                    st.session_state.pending_finalize_drafts = st.session_state.selected_drafts.copy()
-                    print(f"===== BUTTON CLICKED (TOP) - Setting pending_finalize flag =====")
-                    print(f"===== Drafts stored: {st.session_state.pending_finalize_drafts} =====")
-                    st.rerun()
+                    # EXECUTE FINALIZE IMMEDIATELY - No pending flags, no reruns
+                    drafts_to_finalize = st.session_state.selected_drafts.copy()
+
+                    st.write("=" * 50)
+                    st.write("🚀 BUTTON CLICKED - EXECUTING FINALIZE NOW")
+                    st.write(f"📋 Drafts to finalize: {drafts_to_finalize}")
+                    st.write(f"🌐 API URL: {api_service.base_url}/mediaplan/drafts/finalize")
+                    st.write("=" * 50)
+
+                    print(f"===== BUTTON CLICKED (TOP) - EXECUTING FINALIZE =====")
+                    print(f"===== Drafts: {drafts_to_finalize} =====")
+                    print(f"===== API URL: {api_service.base_url}/mediaplan/drafts/finalize =====")
+
+                    with st.spinner("🔄 Calling finalize API..."):
+                        try:
+                            response = api_service.finalize_drafts(drafts_to_finalize)
+
+                            st.write(f"📥 API Response: {response}")
+                            print(f"===== FINALIZE RESPONSE: {response} =====")
+
+                            if response.get("success"):
+                                st.success(f"✅ Successfully finalized {response.get('total_finalized', 0)} media plans!")
+                                st.session_state.selected_drafts = {}
+                                st.balloons()
+                                import time
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Failed: {response.get('message', 'Unknown error')}")
+                                st.json(response)
+                        except Exception as e:
+                            st.error(f"❌ Exception occurred: {str(e)}")
+                            print(f"===== FINALIZE EXCEPTION: {e} =====")
+                            import traceback
+                            st.code(traceback.format_exc())
 
             # Display drafts by asset format
             format_cols = st.columns(min(len(budget_data), 3))
