@@ -122,6 +122,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 # Session state initialization
 if 'selected_drafts' not in st.session_state:
     st.session_state.selected_drafts = {}
@@ -310,6 +311,10 @@ def main():
     with col2:
         if st.button("👁️ View Finalized Plans", use_container_width=True):
             st.session_state.show_finalized_modal = True
+
+            
+    st.write("DEBUG - selected_drafts:", st.session_state.selected_drafts)
+
     with col3:
         if len(st.session_state.selected_drafts) > 0:
             if st.button(f"✅ Finalize Selected ({len(st.session_state.selected_drafts)})", use_container_width=True, type="primary"):
@@ -317,7 +322,7 @@ def main():
                 if response.get("success"):
                     st.success(f"Successfully finalized {response.get('total_finalized', 0)} media plans")
                     st.session_state.selected_drafts = {}
-                    st.rerun()
+                    
 
     if not campaigns:
         st.info("📁 No Drafts Found")
